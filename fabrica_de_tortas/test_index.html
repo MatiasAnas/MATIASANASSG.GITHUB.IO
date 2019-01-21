@@ -1,0 +1,203 @@
+<!doctype html>
+<meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
+<meta content="ISO-8859-1" http-equiv="encoding">
+<html>
+    <head>
+        <title>66.71 Trabajo Practico - Fabrica de tortas</title>
+        <style>
+            body{ background-color: rgb(84, 66, 189); }
+            canvas{ background-color: white; }
+			textarea{ background-color: black; foreground-color: white;}
+            #log {
+            position: absolute;
+            top:50px;
+            left: 100px;
+            z-index: 300;
+            }
+        </style>
+
+          <!-- Libraries -->
+         <script type="text/javascript" src="gl-matrix.js"></script>
+         <script type="text/javascript" src="jquery-1.12.4.js"></script>
+         <script type="text/javascript" src="dat.gui.js"></script>
+        
+          <!-- Scrips -->
+         <script type="text/javascript" src="test_main.js"></script>
+         <script type="text/javascript" src="WebGLConfig.js"></script>
+         <script type="text/javascript" src="camara.js"></script>
+         <script type="text/javascript" src="NodoContenedor.js"></script>
+         <script type="text/javascript" src="Objeto3D.js"></script>
+         <script type="text/javascript" src="Grilla.js"></script>
+         <script type="text/javascript" src="Esfera.js"></script>
+         <script type="text/javascript" src="Copito.js"></script>
+         <script type="text/javascript" src="Plano.js"></script>
+         <script type="text/javascript" src="Rectangulo.js"></script>
+         <script type="text/javascript" src="TrianguloGeometria.js"></script>
+         <script type="text/javascript" src="Maquina_A.js"></script>
+         <script type="text/javascript" src="Maquina_B.js"></script>
+         <script type="text/javascript" src="Maquina_D.js"></script>
+         <script type="text/javascript" src="Superficie.js"></script>
+         <script type="text/javascript" src="SuperficieDeRevolucion.js"></script>
+         <script type="text/javascript" src="CurvaBezier.js"></script>
+         <script type="text/javascript" src="CurvaBSpline.js"></script>
+         <script type="text/javascript" src="Masa.js"></script>
+         <script type="text/javascript" src="Crema.js"></script>
+         <script type="text/javascript" src="Baston.js"></script>
+       
+        <!--
+        Vertex shader
+        --> 
+        <script id="shader-vs" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;     
+            attribute vec3 aVertexNormal;
+            attribute vec2 aVertexTexCoord;
+
+            uniform mat4 uViewMatrix;
+            uniform mat4 uMVMatrix;
+            uniform mat4 uPMatrix;     
+            uniform mat3 uNMatrix;
+
+            uniform vec3 light_pos;
+            uniform vec3 light2_pos;
+            uniform vec3 light3_pos;
+
+            uniform vec3 uCameraPos;
+
+            varying highp vec3 vN;
+            varying highp vec3 vV;
+
+            varying highp vec3 vS;
+            varying highp vec3 vS_2;
+            varying highp vec3 vS_3;
+            
+            varying highp vec2 fTextCoord;
+             
+            void main(void) {
+
+                vec4 P = uMVMatrix * vec4(aVertexPosition, 1.0);
+  
+                vN =  uNMatrix * aVertexNormal ;
+                vV =  uCameraPos-P.xyz ;
+        
+                vS =  vec3( vec4(light_pos,1.0) - P) ;
+                vS_2 =  vec3( vec4(light2_pos,1.0) - P) ;
+                vS_3 =  vec3( vec4(light3_pos,1.0) - P) ;
+                
+                fTextCoord = aVertexTexCoord;
+               
+                gl_Position = uPMatrix * uViewMatrix * P; 
+
+            }
+        </script>
+        
+        <!--
+        Fragment shader
+        -->
+        <script id="shader-fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            uniform  vec3 light_color;
+            uniform  vec3 ambient_color;
+            uniform  float intensidad;
+
+            uniform  vec3 light2_color;
+            uniform  vec3 ambient2_color;
+            uniform  float intensidad2;
+
+            uniform  vec3 light3_color;
+            uniform  vec3 ambient3_color;
+            uniform  float intensidad3;
+
+            uniform  float ka;
+            uniform  float kd;
+            uniform  float ks;
+            uniform  float n;
+            
+            uniform sampler2D utext1;
+           
+            varying highp  vec3 vN;
+            varying highp vec3 vV;
+
+            varying highp vec3 vS;
+            varying highp vec3 vS_2;
+            varying highp vec3 vS_3;
+            
+            varying highp vec2 fTextCoord;
+
+            void main(void) {
+
+            /*Primer luz Puntual en Frente */
+
+                float distancia_ = sqrt(pow(vS[0], 2.0) + pow(vS[1], 2.0) + pow(vS[2], 2.0));
+                float ajuste = intensidad / distancia_ ;
+
+                highp vec3 N = normalize(vN);
+                highp vec3 S = normalize(vS);
+                highp vec3 V = normalize(vV);
+                highp vec3 R = reflect(S,N);
+
+                highp vec3 ambient = ka * ambient_color * ajuste ;
+                highp vec3 diffuse = kd * light_color * max( dot(N,S),0.0) * ajuste ;
+                highp vec3 specular = ks * light_color * pow( max(dot(R,V),0.0) ,n) * ajuste;
+
+                highp vec3 f_color1 = ambient + diffuse  + specular ;
+
+            /*Segunda luz Puntual */
+
+                float distancia2_ = sqrt(pow(vS_2[0], 2.0) + pow(vS_2[1], 2.0) + pow(vS_2[2], 2.0));
+                float ajuste2 = intensidad2 / distancia2_ ;
+
+                highp vec3 S2 = normalize(vS_2);
+                highp vec3 R2 = reflect(S2,N);
+
+                highp vec3 ambient2 = ka * ambient2_color* ajuste2  ;
+                highp vec3 diffuse2 = kd * light2_color * max( dot(N,S2),0.0) * ajuste2 ;
+                highp vec3 specular2 = ks * light2_color * pow( max(dot(R2,V),0.0) ,n) * ajuste2;
+
+                highp vec3 f_color2 = ambient2 + diffuse2  + specular2 ;
+            
+            /*Tercer luz Puntual */
+
+                float distancia3_ = sqrt(pow(vS_3[0], 2.0) + pow(vS_3[1], 2.0) + pow(vS_3[2], 2.0));
+                float ajuste3 = intensidad3 / distancia3_ ;
+
+                highp vec3 S3 = normalize(vS_3);
+                highp vec3 R3 = reflect(S3,N);
+
+                highp vec3 ambient3 = ka * ambient2_color* ajuste3  ;
+                highp vec3 diffuse3 = kd * light2_color * max( dot(N,S3),0.0) * ajuste3 ;
+                highp vec3 specular3 = ks * light2_color * pow( max(dot(R3,V),0.0) ,n) * ajuste3;
+
+                highp vec3 f_color3 = ambient3 + diffuse3  + specular3 ;
+
+            /* Calculo final de la luz por pixel */
+
+                highp vec3 f_color = f_color1 + f_color2 + f_color3 ;
+
+               // gl_FragColor = vec4(f_color, 1.0);
+            	gl_FragColor = texture2D(utext1, fTextCoord);;
+            }
+        </script>
+
+    </head>
+    <body onload="initWebGL()">   
+        <script type="text/javascript" src="Menu.js"></script>
+        
+        <img id="chocolate-textura" src="./texturas/chocolate.jpg" width="0" height="0"></img>
+
+        <div id="log">
+            DeltaX : <span id="valorDeltaX"></span> <br/>
+            DeltaY : <span id="valorDeltaY"></span> <br/>
+            Alfa : <span id="valorAlfa"></span> <br/>
+            Beta : <span id="valorBeta"></span> <br/>
+        </div>
+		<center>
+			<h1>Trabajo Practico - Fabrica de Tortas - 66.71</h1>
+            <h2>Giovanni Valdivia</h2>
+            <h2>Matias Anas</h2>
+			<canvas id="my-canvas" width="1200" height="800">
+			Your browser does not support the HTML5 canvas element.
+			</scanvas>		
+		</center>
+    </body>
+</html>
